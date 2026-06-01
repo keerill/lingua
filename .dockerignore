@@ -1,0 +1,19 @@
+# Keep the Docker build context lean (the context is the monorepo root).
+node_modules
+**/node_modules
+**/dist
+**/.next
+.nx
+.git
+coverage
+tmp
+*.log
+
+# Never bake local secrets/configs into images: containers get env at runtime.
+.env
+
+# Not needed inside images.
+.claude
+prompts
+infra/helm
+infra/docker/docker-compose.dev.yml

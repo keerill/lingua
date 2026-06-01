@@ -1,0 +1,67 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+
+# Next.js (web-public) build output
+.next
+next-env.d.ts
+
+# env
+.env
+.env.local
+
+# generated Prisma 7 clients (regenerated via `prisma generate`)
+apps/*/src/generated
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+*-debug.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Nx
+.nx/cache
+.nx/workspace-data
+
+# Local verification artifacts (Playwright MCP snapshots + screenshots)
+.playwright-mcp/
+/*.png
+
+# Module Federation generated artifacts (regenerated on build)
+**/@mf-types/
+**/.mf/
+
+# Terraform (commit .tf + .terraform.lock.hcl; ignore local state & provider cache)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!*.tfvars.example
+.terraformrc
+terraform.rc
+
+# TypeScript incremental build info
+*.tsbuildinfo
