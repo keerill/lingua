@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package lingua.identity.v1;
+
+// Internal gRPC surface of svc-identity (was internal REST /internal/users/sync).
+service IdentityService {
+  rpc Sync(SyncRequest) returns (UserProfile);
+}
+
+message SyncRequest {
+  string id = 1; // Keycloak sub
+  string email = 2;
+  string display_name = 3;
+  repeated string roles = 4;
+}
+
+message UserProfile {
+  string id = 1;
+  string email = 2;
+  string display_name = 3;
+  repeated string roles = 4;
+  string created_at = 5;
+}

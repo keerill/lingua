@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package lingua.learning.v1;
+
+// Internal gRPC surface of svc-learning (was internal REST /internal/reviews/*).
+// owner_id replaces the x-owner-id HTTP header.
+service LearningService {
+  rpc GetQueue(GetQueueRequest) returns (GetQueueResponse);
+  rpc SubmitReview(SubmitReviewRequest) returns (NextSchedule);
+}
+
+message GetQueueRequest {
+  string owner_id = 1;
+  int32 limit = 2;
+}
+
+message DueScheduleRow {
+  string card_id = 1;
+  string due = 2;
+  string state = 3;
+  int32 reps = 4;
+  int32 lapses = 5;
+}
+
+message GetQueueResponse {
+  repeated DueScheduleRow rows = 1;
+}
+
+message SubmitReviewRequest {
+  string owner_id = 1;
+  string card_id = 2;
+  int32 grade = 3; // 1..4
+}
+
+message NextSchedule {
+  string card_id = 1;
+  string due = 2;
+  double stability = 3;
+  double difficulty = 4;
+  string state = 5;
+  int32 reps = 6;
+  int32 lapses = 7;
+  string last_review = 8;
+}

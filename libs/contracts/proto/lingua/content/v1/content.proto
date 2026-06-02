@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package lingua.content.v1;
+
+// Internal gRPC surface of svc-content consumed by svc-ai-dialog's ScenarioProvider
+// (was internal REST /public/scenarios + /internal/scenarios/:id). Studio CRUD
+// stays on REST — only these two read methods are exposed over gRPC.
+service ContentService {
+  rpc ListScenarios(ListScenariosRequest) returns (ListScenariosResponse);
+  rpc GetScenario(GetScenarioRequest) returns (GetScenarioResponse);
+}
+
+message ScenarioSummary {
+  string id = 1;
+  string slug = 2;
+  string title = 3;
+  string description = 4;
+  string level = 5; // A1 | A2 | B1 | B2 | C1
+}
+
+message Scenario {
+  string id = 1;
+  string slug = 2;
+  string title = 3;
+  string description = 4;
+  string level = 5;
+  string system_prompt = 6;
+  bool published = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message ListScenariosRequest {}
+
+message ListScenariosResponse {
+  repeated ScenarioSummary scenarios = 1;
+}
+
+message GetScenarioRequest {
+  string id = 1;
+}
+
+message GetScenarioResponse {
+  Scenario scenario = 1; // unset == not found (maps to null)
+}

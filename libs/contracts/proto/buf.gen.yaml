@@ -1,0 +1,21 @@
+# Offline codegen (no network): ts-proto for the gRPC service stubs (NestJS),
+# protoc-gen-es for the Kafka event messages (consumed by the Confluent Schema
+# Registry Protobuf serde, which speaks protobuf-es). Output is COMMITTED — the
+# Docker build compiles the committed .ts and never runs buf/protoc.
+#
+# `out` is relative to the directory `buf generate` runs in (repo root).
+# Plugins are invoked via `node <path>` for cross-platform (Windows) safety.
+version: v2
+clean: true
+plugins:
+  - local: ['node', 'node_modules/ts-proto/protoc-gen-ts_proto']
+    out: libs/contracts/src/generated/ts
+    opt:
+      - nestJs=true
+      - esModuleInterop=true
+      - useOptionals=messages
+  - local: ['node', 'node_modules/@bufbuild/protoc-gen-es/bin/protoc-gen-es']
+    out: libs/contracts/src/generated/es
+    opt:
+      - target=ts
+      - import_extension=none

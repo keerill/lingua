@@ -1,0 +1,15 @@
+{
+  "name": "@lingua/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@bufbuild/protobuf": "2.12.0"
+  },
+  "peerDependencies": {
+    "@nestjs/microservices": "11.1.26",
+    "rxjs": "7.8.2"
+  }
+}

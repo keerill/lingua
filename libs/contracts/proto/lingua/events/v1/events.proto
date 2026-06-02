@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package lingua.events.v1;
+
+// Kafka event contracts — the Protobuf mirror of libs/contracts/src/events.ts.
+// Each topic gets a concrete envelope message so its Schema Registry subject
+// (<topic>-value) maps to exactly one top-level message. Union-typed string
+// fields (state/kind/change/channel/...) stay `string` to match the JSON wire
+// 1:1 and keep envelope<->message mapping a trivial field copy.
+
+// --- vocabulary.card.created ---
+message CardCreatedPayload {
+  string card_id = 1;
+  string deck_id = 2;
+  string owner_id = 3;
+  string term = 4;
+}
+
+message CardCreatedEvent {
+  string event_id = 1;
+  string type = 2;
+  string occurred_at = 3;
+  CardCreatedPayload payload = 4;
+}
+
+// --- learning.review.completed ---
+message ReviewCompletedPayload {
+  string user_id = 1;
+  string card_id = 2;
+  int32 grade = 3; // 1..4
+  string reviewed_at = 4;
+  // Post-review FSRS snapshot; optional (older consumers may ignore it).
+  optional string state = 5;
+  optional string due = 6;
+  optional int32 reps = 7;
+  optional int32 lapses = 8;
+}
+
+message ReviewCompletedEvent {
+  string event_id = 1;
+  string type = 2;
+  string occurred_at = 3;
+  ReviewCompletedPayload payload = 4;
+}
+
+// --- speaking.mistake.detected ---
+message SpeakingMistake {
+  string term = 1;
+  optional string translation = 2;
+  string kind = 3; // vocabulary | grammar | pronunciation
+  string context = 4;
+}
+
+message SpeakingMistakeDetectedPayload {
+  string user_id = 1;
+  string session_id = 2;
+  string scenario = 3;
+  repeated SpeakingMistake mistakes = 4;
+}
+
+message SpeakingMistakeDetectedEvent {
+  string event_id = 1;
+  string type = 2;
+  string occurred_at = 3;
+  SpeakingMistakeDetectedPayload payload = 4;
+}
+
+// --- vocabulary.cards.flagged ---
+message CardsFlaggedPayload {
+  string user_id = 1;
+  repeated string card_ids = 2;
+  string reason = 3; // speaking-mistake
+}
+
+message CardsFlaggedEvent {
+  string event_id = 1;
+  string type = 2;
+  string occurred_at = 3;
+  CardsFlaggedPayload payload = 4;
+}
+
+// --- content.scenario.updated ---
+message ScenarioUpdatedPayload {
+  string scenario_id = 1;
+  string slug = 2;
+  string change = 3; // upserted | deleted
+}
+
+message ScenarioUpdatedEvent {
+  string event_id = 1;
+  string type = 2;
+  string occurred_at = 3;
+  ScenarioUpdatedPayload payload = 4;
+}
+
+// --- notification.sent ---
+message NotificationSentPayload {
+  string user_id = 1;
+  string kind = 2; // daily-reminder | streak-at-risk
+  string channel = 3; // log | email | push
+  string sent_at = 4;
+}
+
+message NotificationSentEvent {
+  string event_id = 1;
+  string type = 2;
+  string occurred_at = 3;
+  NotificationSentPayload payload = 4;
+}

@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package lingua.vocabulary.v1;
+
+// Internal gRPC surface of svc-vocabulary (was internal REST /internal/decks,
+// /internal/cards). owner_id replaces the x-owner-id HTTP header.
+service VocabularyService {
+  rpc CreateDeck(CreateDeckRequest) returns (Deck);
+  rpc ListDecks(ListDecksRequest) returns (ListDecksResponse);
+  rpc CreateCard(CreateCardRequest) returns (Card);
+  rpc GetCards(GetCardsRequest) returns (GetCardsResponse);
+}
+
+message Deck {
+  string id = 1;
+  string owner_id = 2;
+  string title = 3;
+  string lang_from = 4;
+  string lang_to = 5;
+  string created_at = 6;
+}
+
+message Card {
+  string id = 1;
+  string deck_id = 2;
+  string term = 3;
+  string translation = 4;
+  optional string example = 5; // unset == null
+  string created_at = 6;
+}
+
+message CreateDeckRequest {
+  string owner_id = 1;
+  string title = 2;
+  string lang_from = 3;
+  string lang_to = 4;
+}
+
+message ListDecksRequest {
+  string owner_id = 1;
+}
+
+message ListDecksResponse {
+  repeated Deck decks = 1;
+}
+
+message CreateCardRequest {
+  string owner_id = 1;
+  string deck_id = 2;
+  string term = 3;
+  string translation = 4;
+  optional string example = 5;
+}
+
+message GetCardsRequest {
+  string owner_id = 1;
+  repeated string card_ids = 2;
+}
+
+message GetCardsResponse {
+  repeated Card cards = 1;
+}
