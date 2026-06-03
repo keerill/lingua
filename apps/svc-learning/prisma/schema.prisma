@@ -1,0 +1,60 @@
+// svc-learning — owns FSRS schedules & review logs (database-per-service).
+// Prisma 7 `prisma-client` generator; datasource URL lives in prisma.config.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// One FSRS schedule per (user, card). Fields mirror ts-fsrs `Card`.
+model CardSchedule {
+  userId        String   @map("user_id")
+  cardId        String   @map("card_id")
+  stability     Float
+  difficulty    Float
+  due           DateTime
+  reps          Int      @default(0)
+  lapses        Int      @default(0)
+  state         Int      @default(0) // ts-fsrs State enum (0..3)
+  lastReview    DateTime? @map("last_review")
+  learningSteps Int      @default(0) @map("learning_steps")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@id([userId, cardId])
+  @@index([userId, due])
+  @@map("card_schedules")
+}
+
+model ReviewLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  cardId     String   @map("card_id")
+  grade      Int
+  reviewedAt DateTime @default(now()) @map("reviewed_at")
+  elapsedMs  Int      @default(0) @map("elapsed_ms")
+
+  @@index([userId, cardId])
+  @@map("review_logs")
+}
+
+// Transactional outbox for learning.review.completed (foundation of the
+// future feedback loop). Same pattern as svc-vocabulary.
+model Outbox {
+  id          String    @id @default(uuid())
+  topic       String
+  key         String
+  payload     Json
+  // W3C trace-context captured at write time → re-injected as Kafka headers at
+  // publish time so the end-to-end trace survives the async outbox gap (4b).
+  headers     Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox")
+}

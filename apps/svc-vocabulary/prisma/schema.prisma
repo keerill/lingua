@@ -1,0 +1,63 @@
+// svc-vocabulary — owns decks & cards (database-per-service).
+// Prisma 7: the `prisma-client` generator emits an ESM/CJS client into the
+// given `output` path; the datasource URL lives in prisma.config.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Deck {
+  id        String   @id @default(uuid())
+  ownerId   String   @map("owner_id")
+  title     String
+  langFrom  String   @map("lang_from")
+  langTo    String   @map("lang_to")
+  // marks system-managed decks (e.g. "speaking" — the deck the feedback
+  // loop seeds). NULL for ordinary user decks. The unique below makes find-or-create
+  // of a user's speaking deck race-free (NULLs are distinct, so user decks are free).
+  source    String?  @map("source")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cards Card[]
+
+  @@unique([ownerId, source])
+  @@index([ownerId])
+  @@map("decks")
+}
+
+model Card {
+  id          String   @id @default(uuid())
+  deckId      String   @map("deck_id")
+  term        String
+  translation String
+  example     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@index([deckId])
+  @@map("cards")
+}
+
+// Transactional outbox: domain write + outbox row committed in one tx; the
+// relay (libs/kafka) publishes unpublished rows to Kafka, then stamps
+// published_at. payload holds the full DomainEvent envelope.
+model Outbox {
+  id          String    @id @default(uuid())
+  topic       String
+  key         String
+  payload     Json
+  // W3C trace-context captured at write time → re-injected as Kafka headers at
+  // publish time so the end-to-end trace survives the async outbox gap (4b).
+  headers     Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox")
+}
