@@ -1,0 +1,4 @@
+export const LEARNING_GRPC = 'LEARNING_GRPC';
+export const VOCABULARY_GRPC = 'VOCABULARY_GRPC';
+export const IDENTITY_GRPC = 'IDENTITY_GRPC';
+export const PROGRESS_GRPC = 'PROGRESS_GRPC';

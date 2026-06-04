@@ -1,0 +1,11 @@
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { AuthUser, CurrentUser, JwtAuthGuard } from '@lingua/auth';
+
+@Controller('me')
+@UseGuards(JwtAuthGuard)
+export class MeController {
+  @Get()
+  me(@CurrentUser() user: AuthUser): AuthUser {
+    return user;
+  }
+}
