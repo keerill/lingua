@@ -1,0 +1,28 @@
+{
+  "name": "mfe-speaking",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/mfe-speaking/src",
+  "projectType": "application",
+  "tags": ["scope:speaking", "type:mfe-remote"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/mfe-speaking",
+        "command": "rspack build -c rspack.config.cjs"
+      },
+      "configurations": {
+        "production": { "args": ["--mode", "production"] },
+        "development": { "args": ["--mode", "development"] }
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/mfe-speaking",
+        "command": "rspack serve -c rspack.config.cjs"
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "svc-speech",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/svc-speech/src",
+  "projectType": "application",
+  "tags": ["scope:speech", "type:service"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-speech",
+        "command": "node --env-file=../../.env --watch -r @swc-node/register src/main.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/svc-speech",
+        "command": "tsc -p tsconfig.app.json"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "apps/svc-speech/jest.config.ts"
+      }
+    }
+  }
+}

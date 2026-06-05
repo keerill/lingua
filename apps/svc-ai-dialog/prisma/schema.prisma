@@ -1,0 +1,55 @@
+// svc-ai-dialog — owns dialog sessions/turns + its transactional outbox
+// (database-per-service). Prisma 7: generated client into src/generated/prisma;
+// connection URL in prisma.config.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model DialogSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  scenario  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  turns DialogTurn[]
+
+  @@index([userId])
+  @@map("dialog_sessions")
+}
+
+model DialogTurn {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  userId    String   @map("user_id")
+  userText  String   @map("user_text")
+  aiText    String   @map("ai_text")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session DialogSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("dialog_turns")
+}
+
+// Transactional outbox: turn + outbox row committed in one tx; the relay
+// (libs/kafka) publishes unpublished rows to Kafka, then stamps published_at.
+model Outbox {
+  id          String    @id @default(uuid())
+  topic       String
+  key         String
+  payload     Json
+  // W3C trace-context captured at write time → re-injected as Kafka headers at
+  // publish time so the end-to-end trace survives the async outbox gap (4b).
+  headers     Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox")
+}
