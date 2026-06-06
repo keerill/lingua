@@ -1,0 +1,53 @@
+// svc-notifications — reminders (database-per-service). Tracks per-user activity
+// to decide who gets a daily reminder or a "streak at risk" nudge; the actual
+// send is a stub in (logs + notification.sent event).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// One row per user, kept current by the event consumers.
+model UserActivity {
+  userId          String  @id @map("user_id")
+  // Last day (YYYY-MM-DD, UTC) the user completed a review.
+  lastReviewedDay String? @map("last_reviewed_day")
+  // Whether the user currently has cards due/flagged for review.
+  hasDue          Boolean @default(false) @map("has_due")
+  // Last day we sent this user a reminder (dedupe: at most one per day).
+  lastReminderDay String? @map("last_reminder_day")
+
+  @@map("user_activity")
+}
+
+// Audit trail of dispatched reminders.
+model Notification {
+  id      String   @id @default(uuid())
+  userId  String   @map("user_id")
+  kind    String
+  channel String
+  sentAt  DateTime @default(now()) @map("sent_at")
+
+  @@index([userId, sentAt])
+  @@map("notifications")
+}
+
+// Transactional outbox for `notification.sent`.
+model Outbox {
+  id          String    @id @default(uuid())
+  topic       String
+  key         String
+  payload     Json
+  // W3C trace-context captured at write time → re-injected as Kafka headers at
+  // publish time so the end-to-end trace survives the async outbox gap (4b).
+  headers     Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox")
+}

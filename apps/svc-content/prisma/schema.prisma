@@ -1,0 +1,74 @@
+// svc-content — owns conversation scenarios, lessons and deck templates
+// (database-per-service). Prisma 7: `prisma-client` generator → src/generated/prisma;
+// datasource URL lives in prisma.config.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Conversation scenario (mode). `system_prompt` drives the LLM in svc-ai-dialog;
+// it is NEVER exposed on the public API. `published` gates public/learner visibility.
+model Scenario {
+  id           String   @id @default(uuid())
+  slug         String   @unique
+  title        String
+  description  String
+  systemPrompt String   @map("system_prompt")
+  level        String
+  published    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("scenarios")
+}
+
+model Lesson {
+  id              String   @id @default(uuid())
+  slug            String   @unique
+  title           String
+  summary         String
+  contentMarkdown String   @map("content_markdown")
+  level           String
+  order           Int      @default(0)
+  published       Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("lessons")
+}
+
+// A curated starter deck. `cards` holds DeckTemplateCard[] as jsonb.
+model DeckTemplate {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  description String
+  level       String
+  cards       Json
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("deck_templates")
+}
+
+// Transactional outbox: scenario change + outbox row committed in one tx; the
+// relay (libs/kafka) publishes `content.scenario.updated` to Kafka.
+model Outbox {
+  id          String    @id @default(uuid())
+  topic       String
+  key         String
+  payload     Json
+  // W3C trace-context captured at write time → re-injected as Kafka headers at
+  // publish time so the end-to-end trace survives the async outbox gap (4b).
+  headers     Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox")
+}

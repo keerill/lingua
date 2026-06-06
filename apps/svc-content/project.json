@@ -1,0 +1,52 @@
+{
+  "name": "svc-content",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/svc-content/src",
+  "projectType": "application",
+  "tags": ["scope:content", "type:service"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-content",
+        "command": "node --env-file=../../.env --watch -r @swc-node/register src/main.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/svc-content",
+        "command": "tsc -p tsconfig.app.json"
+      }
+    },
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-content",
+        "command": "prisma generate"
+      }
+    },
+    "prisma-migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-content",
+        "command": "prisma migrate dev"
+      }
+    },
+    "prisma-seed": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-content",
+        "command": "node --env-file=../../.env -r @swc-node/register prisma/seed.ts"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "apps/svc-content/jest.config.ts"
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+// svc-progress — event-sourced read-model for the learner dashboard
+// (database-per-service). Consumes learning/speaking events; produces nothing.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Idempotency guard: at-least-once delivery means an event may arrive twice.
+model ProcessedEvent {
+  eventId     String   @id @map("event_id")
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("processed_events")
+}
+
+// Latest FSRS snapshot per (user, card). Powers due-count and learned-words.
+// `learnedAt` is set the first time the card reaches the `Review` state.
+model CardState {
+  userId    String   @map("user_id")
+  cardId    String   @map("card_id")
+  state     String
+  due       DateTime
+  learnedAt DateTime? @map("learned_at")
+
+  @@id([userId, cardId])
+  @@index([userId])
+  @@map("card_state")
+}
+
+// Per-day rollups for the time series + streak calculation.
+model DailyActivity {
+  userId  String @map("user_id")
+  day     String // YYYY-MM-DD (UTC)
+  reviews Int    @default(0)
+  learned Int    @default(0)
+
+  @@id([userId, day])
+  @@map("daily_activity")
+}
+
+model PronunciationDaily {
+  userId   String @map("user_id")
+  day      String // YYYY-MM-DD (UTC)
+  mistakes Int    @default(0)
+
+  @@id([userId, day])
+  @@map("pronunciation_daily")
+}

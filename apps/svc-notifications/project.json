@@ -1,0 +1,45 @@
+{
+  "name": "svc-notifications",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/svc-notifications/src",
+  "projectType": "application",
+  "tags": ["scope:notifications", "type:service"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-notifications",
+        "command": "node --env-file=../../.env --watch -r @swc-node/register src/main.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/svc-notifications",
+        "command": "tsc -p tsconfig.app.json"
+      }
+    },
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-notifications",
+        "command": "prisma generate"
+      }
+    },
+    "prisma-migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-notifications",
+        "command": "prisma migrate dev"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "apps/svc-notifications/jest.config.ts"
+      }
+    }
+  }
+}

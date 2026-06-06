@@ -1,0 +1,45 @@
+{
+  "name": "svc-progress",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/svc-progress/src",
+  "projectType": "application",
+  "tags": ["scope:progress", "type:service"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-progress",
+        "command": "node --env-file=../../.env --watch -r @swc-node/register src/main.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/svc-progress",
+        "command": "tsc -p tsconfig.app.json"
+      }
+    },
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-progress",
+        "command": "prisma generate"
+      }
+    },
+    "prisma-migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-progress",
+        "command": "prisma migrate dev"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "apps/svc-progress/jest.config.ts"
+      }
+    }
+  }
+}
