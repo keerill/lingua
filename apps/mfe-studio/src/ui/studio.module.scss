@@ -1,0 +1,142 @@
+.shell {
+  padding: 24px;
+  max-width: 860px;
+}
+
+.nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.navLink,
+.navLinkActive {
+  padding: 8px 14px;
+  text-decoration: none;
+  color: #374151;
+  border-bottom: 2px solid transparent;
+}
+
+.navLinkActive {
+  color: #111827;
+  border-bottom-color: #2563eb;
+  font-weight: 600;
+}
+
+.screen {
+  display: grid;
+  gap: 20px;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.input,
+.textarea,
+.select {
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 90px;
+  font-family: monospace;
+}
+
+.button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.itemMain {
+  flex: 1;
+}
+
+.tag,
+.tagPublished {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.tag {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.tagPublished {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+}
+
+.danger {
+  background: none;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0;
+}
+
+.error {
+  color: crimson;
+}
+
+.hint {
+  color: #6b7280;
+  font-size: 13px;
+}

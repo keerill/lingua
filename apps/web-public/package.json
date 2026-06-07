@@ -1,0 +1,11 @@
+{
+  "name": "@lingua/web-public",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@lingua/contracts": "workspace:*",
+    "next": "16.2.7",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  }
+}
