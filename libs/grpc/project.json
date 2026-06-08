@@ -1,0 +1,16 @@
+{
+  "name": "grpc",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/grpc/src",
+  "projectType": "library",
+  "tags": ["scope:shared", "type:grpc"],
+  "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "libs/grpc/jest.config.ts"
+      }
+    }
+  }
+}
