@@ -1,0 +1,78 @@
+{{- if .Values.global.observability.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/part-of: lingua
+data:
+  tempo.yaml: |
+{{ .Files.Get "files/tempo.yaml" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tempo
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/part-of: lingua
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tempo
+      annotations:
+        checksum/config: {{ .Files.Get "files/tempo.yaml" | sha256sum }}
+    spec:
+      enableServiceLinks: false
+      securityContext:
+        # uid/gid 10001 = the grafana/tempo image user; fsGroup makes the
+        # emptyDir writable.
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: tempo
+          image: {{ .Values.image }}
+          args: ['-config.file=/etc/tempo/tempo.yaml']
+          ports:
+            - { name: http, containerPort: 3200 }
+            - { name: otlp-grpc, containerPort: 4317 }
+          volumeMounts:
+            - { name: config, mountPath: /etc/tempo, readOnly: true }
+            - { name: data, mountPath: /var/tempo }
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: tempo
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/part-of: lingua
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: tempo
+  ports:
+    - { name: http, port: 3200, targetPort: http }
+    - { name: otlp-grpc, port: 4317, targetPort: otlp-grpc }
+{{- end }}

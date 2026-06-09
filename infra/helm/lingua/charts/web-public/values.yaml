@@ -1,0 +1,19 @@
+image:
+  repository: lingua/web-public
+
+port: 4205
+# SSR pages degrade gracefully when svc-content is unreachable, so probing /
+# is safe.
+probePath: /
+
+ingress:
+  enabled: true
+  subdomain: www
+
+env:
+  PORT: '4205'
+  SITE_URL: 'http://www.{{ .Values.global.domain }}'
+  # Target of the "open the app" CTA — the shell SPA (same host gateway-bff uses).
+  SHELL_PUBLIC_URL: 'http://app.{{ .Values.global.domain }}'
+  # Server-side only: SSR fetches content over the cluster network.
+  CONTENT_PUBLIC_API_URL: http://svc-content:3106

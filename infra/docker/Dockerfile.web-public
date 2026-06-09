@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Lingua — web-public (Next.js 16 SSR) image,.
+#
+# Build from the REPO ROOT (build context = monorepo root):
+#   docker build -f infra/docker/Dockerfile.web-public -t lingua/web-public .
+#
+# next.config.mjs sets `output: 'standalone'` + outputFileTracingRoot=repo
+# root, so the build emits a self-contained server under
+# .next/standalone/apps/web-public/server.js with a pruned node_modules.
+# SITE_URL / CONTENT_PUBLIC_API_URL are read at REQUEST time (SSR, no-store) —
+# they are runtime env, not build args.
+# ---------------------------------------------------------------------------
+
+ARG NODE_IMAGE=node:24-slim
+
+# --- workspace: full monorepo install (shared verbatim with the other
+# Dockerfiles so BuildKit reuses the layers across all images) ---------------
+FROM ${NODE_IMAGE} AS workspace
+WORKDIR /repo
+
+# python3/make/g++: fallback toolchain for native deps without linux prebuilds.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
+
+# Fetch packages from the lockfile only — this layer survives source edits.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm fetch
+
+COPY . .
+RUN pnpm install --frozen-lockfile --offline
+
+# --- build -------------------------------------------------------------------
+FROM workspace AS build
+ENV NODE_ENV=production NX_DAEMON=false
+RUN pnpm exec nx build web-public
+
+# --- runtime -----------------------------------------------------------------
+FROM ${NODE_IMAGE} AS runtime
+ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=4205
+WORKDIR /app
+
+# The standalone tree mirrors the monorepo layout (tracing root = repo root);
+# static client assets are not traced and must be copied alongside.
+COPY --from=build --chown=node:node /repo/apps/web-public/.next/standalone ./
+COPY --from=build --chown=node:node /repo/apps/web-public/.next/static ./apps/web-public/.next/static
+
+USER node
+CMD ["node", "apps/web-public/server.js"]

@@ -1,0 +1,21 @@
+image:
+  repository: lingua/svc-ai-dialog
+
+port: 3104
+
+migration:
+  enabled: true
+
+env:
+  SVC_AI_DIALOG_PORT: '3104'
+  KAFKA_BROKERS: '{{ .Values.global.kafkaBrokers }}'
+  # scenarios are fetched from svc-content over gRPC (host:port).
+  SVC_CONTENT_GRPC_URL: svc-content:50056
+  # Deterministic fake LLM by default; switch with
+  #   --set svc-ai-dialog.env.LLM_PROVIDER=anthropic --set secrets.anthropicApiKey=...
+  LLM_PROVIDER: fake
+  ANTHROPIC_MODEL: claude-opus-4-8
+
+secretEnv:
+  - DATABASE_URL_DIALOG
+  - ANTHROPIC_API_KEY

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: loki
+description: Grafana Loki — log store (OTLP-native ingest, queried by Grafana)
+type: application
+version: 0.1.0

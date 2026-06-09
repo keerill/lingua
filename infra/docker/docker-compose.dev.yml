@@ -1,0 +1,202 @@
+# ---------------------------------------------------------------------------
+# Lingua — local infrastructure (walking skeleton).
+#
+# Brings up the stateful dependencies the services connect to from the HOST
+# (services themselves are run via `nx serve` on the host):
+#   - postgres   : one container, seven logical DBs (one per service, see
+#                  postgres/init-databases.sh)
+#   - redis      : declared for future use
+#   - kafka      : single-node KRaft (no ZooKeeper)
+#   - keycloak   : OIDC, realm imported on first boot
+# - minio : object store for audio
+#
+# Usage:
+#   docker compose -f infra/docker/docker-compose.dev.yml up -d
+#
+# All host-facing ports match the values in the repo-root `.env`.
+# ---------------------------------------------------------------------------
+
+name: lingua-dev
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: lingua-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lingua
+      POSTGRES_PASSWORD: lingua
+      # Default DB; the init script creates the three per-service DBs.
+      POSTGRES_DB: lingua
+    ports:
+      - '5432:5432'
+    volumes:
+      # Postgres 18 images store data in a version-specific subdir; mount the
+      # PARENT dir (not /var/lib/postgresql/data) or the image refuses to start.
+      - postgres-data:/var/lib/postgresql
+      # Runs only on first boot (empty data dir). Creates identity/vocabulary/learning.
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lingua']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lingua
+
+  redis:
+    image: redis:7-alpine
+    container_name: lingua-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - lingua
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: lingua-kafka
+    restart: unless-stopped
+    ports:
+      # Host clients (KAFKA_BROKERS=localhost:9092) connect here.
+      - '9092:9092'
+    environment:
+      # --- KRaft single-node: this node is BOTH broker and controller ---
+      KAFKA_NODE_ID: '1'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:9093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+
+      # --- Listeners ---
+      # All app services (incl. svc-ai-dialog/svc-speech) run on the HOST via
+      # `nx serve`, so a single PLAINTEXT listener advertised as localhost:9092 is
+      # enough. CONTROLLER is the internal KRaft listener and is NOT advertised.
+      # Empty host (`://:9092`) binds ALL interfaces — the apache/kafka blessed form.
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092'
+
+      # --- Single-node replication / dev defaults ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: '1'
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: '1'
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: '0'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      # The official image ships the CLI tools under /opt/kafka/bin.
+      test:
+        [
+          'CMD-SHELL',
+          '/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1',
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+    networks:
+      - lingua
+
+  # One-shot: pre-create the event topics so consumers that subscribe before any
+  # producer has run don't log noisy "Unknown topic or partition" retries at first
+  # boot. Shares the broker's network namespace so localhost:9092 (the only
+  # advertised listener) resolves. Exits 0 when done.
+  kafka-setup:
+    image: apache/kafka:3.9.0
+    container_name: lingua-kafka-setup
+    depends_on:
+      kafka:
+        condition: service_healthy
+    network_mode: 'service:kafka'
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        for t in vocabulary.card.created learning.review.completed speaking.mistake.detected vocabulary.cards.flagged content.scenario.updated notification.sent; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
+            --create --if-not-exists --topic "$$t" --partitions 1 --replication-factor 1
+        done
+        echo 'kafka topics ready'
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: lingua-keycloak
+    restart: unless-stopped
+    command: ['start-dev', '--import-realm']
+    environment:
+      # KC 26 uses KC_BOOTSTRAP_ADMIN_*; we also set the legacy KEYCLOAK_ADMIN_*
+      # vars so the bootstrap admin is created regardless of which the running
+      # patch release honours.
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: 'true'
+      KC_HTTP_ENABLED: 'true'
+    ports:
+      - '8080:8080'
+    volumes:
+      # Realm `lingua` is imported on startup (start-dev uses an embedded H2 DB,
+      # which is fine for local dev).
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    networks:
+      - lingua
+
+  # --- object store for conversation audio (STT input / TTS output).
+  # All app services run on the HOST via `nx serve`, so only the stateful deps
+  # live in compose. --
+  minio:
+    image: minio/minio:latest
+    container_name: lingua-minio
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000' # S3 API (host clients + browser playback)
+      - '9001:9001' # web console
+    volumes:
+      - minio-data:/data
+    networks:
+      - lingua
+
+  # One-shot: wait for MinIO, create the audio bucket, make it download-public so
+  # the browser can play TTS clips by URL. Exits 0 when done.
+  minio-setup:
+    image: minio/mc:latest
+    container_name: lingua-minio-setup
+    depends_on:
+      - minio
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 minioadmin minioadmin; do
+          echo 'waiting for minio...'; sleep 2;
+        done
+        mc mb --ignore-existing local/lingua-audio
+        mc anonymous set download local/lingua-audio
+        echo 'minio bucket lingua-audio ready'
+    networks:
+      - lingua
+
+volumes:
+  postgres-data:
+  redis-data:
+  kafka-data:
+  minio-data:
+
+networks:
+  lingua:
+    name: lingua-dev
+    driver: bridge

@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------
+# Lingua — static frontend image (shell + any MFE remote),.
+#
+# Build from the REPO ROOT (build context = monorepo root):
+#   docker build -f infra/docker/Dockerfile.mfe \
+#     --build-arg PROJECT=shell \
+#     --build-arg BFF_URL=http://api.lingua.localhost \
+#     --build-arg MFE_LEARNER_REMOTE=http://mfe-learner.lingua.localhost/mf-manifest.json \
+#     ... -t lingua/shell .
+#
+# Frontend URLs (BFF_URL, MFE_*_REMOTE) are baked at BUILD time (Rspack
+# DefinePlugin / MF remotes config), hence the build args. Remotes only need
+# BFF_URL; the MFE_*_REMOTE args matter for the shell host.
+# Runtime is a non-root nginx serving the Rspack dist (see static-site.conf).
+# ---------------------------------------------------------------------------
+
+ARG NODE_IMAGE=node:24-slim
+
+# --- workspace: full monorepo install (shared verbatim with the other
+# Dockerfiles so BuildKit reuses the layers across all images) ---------------
+FROM ${NODE_IMAGE} AS workspace
+WORKDIR /repo
+
+# python3/make/g++: fallback toolchain for native deps without linux prebuilds.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
+
+# Fetch packages from the lockfile only — this layer survives source edits.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm fetch
+
+COPY . .
+RUN pnpm install --frozen-lockfile --offline
+
+# --- build -------------------------------------------------------------------
+FROM workspace AS build
+ARG PROJECT
+ARG BFF_URL
+ARG MFE_LEARNER_REMOTE
+ARG MFE_SPEAKING_REMOTE
+ARG MFE_PROGRESS_REMOTE
+ARG MFE_STUDIO_REMOTE
+
+ENV NODE_ENV=production \
+    NX_DAEMON=false \
+    BFF_URL=${BFF_URL} \
+    MFE_LEARNER_REMOTE=${MFE_LEARNER_REMOTE} \
+    MFE_SPEAKING_REMOTE=${MFE_SPEAKING_REMOTE} \
+    MFE_PROGRESS_REMOTE=${MFE_PROGRESS_REMOTE} \
+    MFE_STUDIO_REMOTE=${MFE_STUDIO_REMOTE}
+
+RUN pnpm exec nx build "${PROJECT}"
+
+# --- runtime -----------------------------------------------------------------
+# nginx-unprivileged: listens on 8080, runs as uid 101 (non-root).
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+ARG PROJECT
+
+COPY infra/docker/nginx/static-site.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /repo/apps/${PROJECT}/dist /usr/share/nginx/html

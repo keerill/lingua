@@ -1,0 +1,5 @@
+apiVersion: v2
+name: redis
+description: Redis 7 (compose parity; not used by app code yet)
+type: application
+version: 0.1.0

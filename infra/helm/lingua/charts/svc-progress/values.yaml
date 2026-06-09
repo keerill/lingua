@@ -1,0 +1,16 @@
+image:
+  repository: lingua/svc-progress
+
+port: 3107
+grpcPort: 50057
+
+migration:
+  enabled: true
+
+env:
+  SVC_PROGRESS_PORT: '3107'
+  SVC_PROGRESS_GRPC_PORT: '50057'
+  KAFKA_BROKERS: '{{ .Values.global.kafkaBrokers }}'
+
+secretEnv:
+  - DATABASE_URL_PROGRESS

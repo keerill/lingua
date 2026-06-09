@@ -1,0 +1,130 @@
+# ---------------------------------------------------------------------------
+# Lingua — production image for any NestJS service in apps/.
+#
+# Build from the REPO ROOT (build context = monorepo root):
+#   docker build -f infra/docker/Dockerfile.service \
+#     --build-arg SERVICE=svc-vocabulary -t lingua/svc-vocabulary .
+#
+# Targets:
+#   runtime  (default) — minimal non-root image: pruned prod node_modules +
+#                        compiled dist; CMD node dist/apps/service/src/main.js
+#   migrator           — full workspace with the Prisma CLI; used by k8s Jobs /
+#                        initContainers to run `prisma migrate deploy` and the
+#                        svc-content seed. One image serves every service.
+#
+# Why compile with tsconfig.docker.json + tsc-alias: the @lingua/* libs are
+# TypeScript-source workspace packages (resolved via tsconfig paths + swc-node
+# in dev). For plain `node` we compile app+libs together (rootDir = repo root)
+# and rewrite the @lingua/* aliases to relative paths inside dist/.
+# ---------------------------------------------------------------------------
+
+ARG NODE_IMAGE=node:24-slim
+
+# --- workspace: full monorepo install (shared verbatim with the other
+# Dockerfiles so BuildKit reuses the layers across all images) ---------------
+FROM ${NODE_IMAGE} AS workspace
+WORKDIR /repo
+
+# python3/make/g++: fallback toolchain for native deps without linux prebuilds.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
+
+# Fetch packages from the lockfile only — this layer survives source edits.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm fetch
+
+COPY . .
+RUN pnpm install --frozen-lockfile --offline
+
+# --- migrator: one image for all Prisma services -----------------------------
+# k8s overrides workdir+command per service, e.g.
+#   workingDir: /repo/apps/svc-vocabulary
+#   command: ["/repo/node_modules/.bin/prisma", "migrate", "deploy"]
+# Seed (svc-content): ["node", "-r", "@swc-node/register", "prisma/seed.ts"]
+FROM workspace AS migrator
+
+# Generated clients are needed by seed scripts (they import src/generated/prisma).
+# prisma.config.ts resolves DATABASE_URL_* eagerly via env(), but `generate`
+# never connects — feed it build-time dummies (k8s Jobs set the real ones).
+RUN for dir in apps/*/prisma; do \
+      (cd "$(dirname "$dir")" && \
+       DATABASE_URL_IDENTITY=postgresql://build:build@localhost:5432/build \
+       DATABASE_URL_VOCABULARY=postgresql://build:build@localhost:5432/build \
+       DATABASE_URL_LEARNING=postgresql://build:build@localhost:5432/build \
+       DATABASE_URL_DIALOG=postgresql://build:build@localhost:5432/build \
+       DATABASE_URL_CONTENT=postgresql://build:build@localhost:5432/build \
+       DATABASE_URL_PROGRESS=postgresql://build:build@localhost:5432/build \
+       DATABASE_URL_NOTIFICATIONS=postgresql://build:build@localhost:5432/build \
+       pnpm exec prisma generate); \
+    done
+
+# Jobs run as non-root and only read /repo + write caches under $HOME.
+ENV HOME=/tmp NODE_ENV=production
+USER node
+CMD ["/repo/node_modules/.bin/prisma", "--version"]
+
+# --- build: compile one service ----------------------------------------------
+FROM workspace AS build
+ARG SERVICE
+
+# Dummy DATABASE_URL_*: prisma.config.ts resolves it eagerly, generate never connects.
+RUN if [ -d "apps/${SERVICE}/prisma" ]; then \
+      cd "apps/${SERVICE}" && \
+      DATABASE_URL_IDENTITY=postgresql://build:build@localhost:5432/build \
+      DATABASE_URL_VOCABULARY=postgresql://build:build@localhost:5432/build \
+      DATABASE_URL_LEARNING=postgresql://build:build@localhost:5432/build \
+      DATABASE_URL_DIALOG=postgresql://build:build@localhost:5432/build \
+      DATABASE_URL_CONTENT=postgresql://build:build@localhost:5432/build \
+      DATABASE_URL_PROGRESS=postgresql://build:build@localhost:5432/build \
+      DATABASE_URL_NOTIFICATIONS=postgresql://build:build@localhost:5432/build \
+      pnpm exec prisma generate; \
+    fi
+
+# Emits dist/apps/<service>/src/** + dist/libs/** (rootDir = repo root), then
+# rewrites @lingua/* imports to relative paths within dist/.
+RUN pnpm exec tsc -p "apps/${SERVICE}/tsconfig.docker.json" \
+  && pnpm exec tsc-alias -p "apps/${SERVICE}/tsconfig.docker.json"
+
+# Pruned production node_modules for this service only. (NOT --legacy: legacy
+# deploy drags in the ROOT manifest's prod deps — next, react, recharts, ...)
+RUN pnpm --filter "@lingua/${SERVICE}" deploy --prod \
+      --config.inject-workspace-packages=true /deploy
+
+# @prisma/client declares prisma + typescript as OPTIONAL peers; because they
+# exist in the workspace root, deploy materialises the whole CLI chain
+# (~190 MB: prisma, studio, pglite, effect, typescript). The runtime client
+# (driver adapter, Rust-free) never requires them — drop the dead weight.
+# Migrations/seed use the `migrator` image, which keeps the full CLI.
+RUN rm -rf /deploy/node_modules/.pnpm/prisma@* \
+           /deploy/node_modules/.pnpm/@prisma+studio-core@* \
+           /deploy/node_modules/.pnpm/@prisma+dev@* \
+           /deploy/node_modules/.pnpm/@prisma+engines@* \
+           /deploy/node_modules/.pnpm/@electric-sql+pglite@* \
+           /deploy/node_modules/.pnpm/effect@* \
+           /deploy/node_modules/.pnpm/typescript@* \
+           /deploy/node_modules/prisma \
+           /deploy/node_modules/typescript
+
+# --- runtime ------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS runtime
+ARG SERVICE
+ENV NODE_ENV=production
+WORKDIR /app
+
+COPY --from=build --chown=node:node /deploy/node_modules ./node_modules
+COPY --from=build --chown=node:node /repo/apps/${SERVICE}/package.json ./package.json
+# Normalise the per-service path so CMD does not depend on the build arg; the
+# src→libs relative depth inside dist/ is preserved.
+COPY --from=build --chown=node:node /repo/apps/${SERVICE}/dist/apps/${SERVICE} ./dist/apps/service
+COPY --from=build --chown=node:node /repo/apps/${SERVICE}/dist/libs ./dist/libs
+# the gRPC transport loads the.proto contracts at runtime (they are
+# not compiled). resolveProtoRoot() finds them under <cwd>/proto = /app/proto.
+# Static files only — no buf/protoc runs in the image; generated TS is compiled
+# above with the rest of dist/libs.
+COPY --from=build --chown=node:node /repo/libs/contracts/proto ./proto
+
+USER node
+CMD ["node", "dist/apps/service/src/main.js"]

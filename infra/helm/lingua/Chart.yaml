@@ -1,0 +1,11 @@
+apiVersion: v2
+name: lingua
+description: >-
+  Umbrella chart for the Lingua stack: 9 NestJS services, 5 static frontends,
+  the Next.js public site and the infrastructure dependencies (PostgreSQL,
+  Redis, Kafka KRaft, Keycloak, MinIO). Subcharts live unpacked under charts/
+  (one chart per service + the lingua-common library), so a plain
+  `helm install` works without `helm dependency build`.
+type: application
+version: 0.1.0
+appVersion: '0.5.0'

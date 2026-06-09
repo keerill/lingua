@@ -1,0 +1,31 @@
+image:
+  repository: lingua/gateway-bff
+
+port: 3000
+
+ingress:
+  enabled: true
+  subdomain: api
+
+env:
+  GATEWAY_BFF_PORT: '3000'
+  SHELL_PUBLIC_URL: 'http://app.{{ .Values.global.domain }}'
+  BFF_PUBLIC_URL: 'http://api.{{ .Values.global.domain }}'
+  # Same public URL inside and outside the cluster (CoreDNS rewrites the host
+  # to Traefik), so the JWT issuer matches everywhere.
+  KEYCLOAK_URL: 'http://id.{{ .Values.global.domain }}'
+  KEYCLOAK_REALM: lingua
+  KEYCLOAK_BFF_CLIENT_ID: lingua-bff
+  SVC_AI_DIALOG_URL: http://svc-ai-dialog:3104
+  SVC_SPEECH_URL: http://svc-speech:3105
+  SVC_CONTENT_URL: http://svc-content:3106
+  # learning/vocabulary/identity/progress are called over gRPC
+  # (host:port, no scheme). dialog/speech/content stay REST above.
+  SVC_LEARNING_GRPC_URL: svc-learning:50053
+  SVC_VOCABULARY_GRPC_URL: svc-vocabulary:50052
+  SVC_IDENTITY_GRPC_URL: svc-identity:50051
+  SVC_PROGRESS_GRPC_URL: svc-progress:50057
+
+secretEnv:
+  - BFF_COOKIE_SECRET
+  - KEYCLOAK_BFF_CLIENT_SECRET

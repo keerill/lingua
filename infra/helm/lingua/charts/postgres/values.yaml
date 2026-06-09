@@ -1,0 +1,16 @@
+# Toggle the in-cluster database. Staging disables it (managed PostgreSQL) via
+# the umbrella `postgres.enabled: false` override.
+enabled: true
+
+image: postgres:18-alpine
+
+user: lingua
+
+storage: 2Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi

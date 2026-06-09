@@ -1,0 +1,8 @@
+apiVersion: v2
+name: schema-registry
+description: >-
+  Confluent Schema Registry (Protobuf) for Kafka. Rendered only when
+  global.schemaRegistry.enabled=true; stores schemas in the broker's _schemas
+  topic, so it works against the single-node KRaft broker.
+type: application
+version: 0.1.0

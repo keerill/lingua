@@ -1,0 +1,5 @@
+apiVersion: v2
+name: svc-notifications
+description: Lingua notifications service (reminder scheduler, stub sender)
+type: application
+version: 0.1.0

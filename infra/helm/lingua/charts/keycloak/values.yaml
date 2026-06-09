@@ -1,0 +1,23 @@
+image: quay.io/keycloak/keycloak:26.1
+
+ingress:
+  subdomain: id
+
+db:
+  user: lingua
+  database: keycloak
+  # Full JDBC URL. Empty → built from the in-cluster postgres host + database
+  # above. Staging sets the managed JDBC URL (with ?sslmode=require).
+  url: ''
+  # lingua-secrets key holding the DB password. Staging points it at the managed
+  # password key.
+  passwordSecretKey: POSTGRES_PASSWORD
+
+adminUser: admin
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    memory: 1280Mi

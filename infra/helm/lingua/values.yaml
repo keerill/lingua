@@ -1,0 +1,84 @@
+# ---------------------------------------------------------------------------
+# Lingua umbrella values (local k3d environment).
+#
+# global.* is visible to every subchart; per-service settings live in each
+# subchart's own values.yaml and can be overridden here under the chart name
+# (e.g. `svc-ai-dialog: { env: { LLM_PROVIDER: anthropic } }`).
+#
+# Secrets here are local-demo defaults. Real secret management (SOPS,
+# external-secrets, vault) is out of scope here.
+# ---------------------------------------------------------------------------
+
+global:
+  # *.lingua.localhost resolves to 127.0.0.1 in browsers (and in the cluster
+  # via the CoreDNS rewrite for the Keycloak host).
+  domain: lingua.localhost
+  # k3d-managed registry: pushed from the host as localhost:5500, pulled by
+  # the nodes as lingua-registry:5500 (the node's registries.yaml mirrors that
+  # host:port to the in-cluster registry container http://lingua-registry:5000).
+  imageRegistry: lingua-registry:5500
+  imageTag: dev
+  # The dev tag is mutable — always pull so `build-images + rollout restart`
+  # picks up fresh code.
+  imagePullPolicy: Always
+  ingressClassName: traefik
+  secretName: lingua-secrets
+  # Pull secrets for private registries (staging pulls from GHCR via a
+  # `ghcr-pull` docker-registry secret). Empty for k3d (local registry is
+  # unauthenticated). Rendered on every pod + the migrator initContainer + seed.
+  imagePullSecrets: []
+  # Kafka bootstrap brokers, injected as KAFKA_BROKERS into the event services.
+  # k3d/compose use the in-cluster broker; staging overrides with the managed
+  # broker list.
+  kafkaBrokers: kafka:9092
+  # managed Kafka auth (SASL_SSL). When enabled, lingua-common injects
+  # KAFKA_SSL + KAFKA_SASL_* (from lingua-secrets) into every event service so
+  # libs/kafka authenticates to a managed cluster (e.g. DO Managed Kafka).
+  # Disabled for k3d/compose (PLAINTEXT, no creds), exactly like observability.
+  kafkaAuth:
+    enabled: false
+  # Shared between the Keycloak realm import and the gateway-bff env (via
+  # lingua-secrets).
+  keycloakBffClientSecret: lingua-bff-secret
+  # observability stack (otel-collector, tempo, loki, prometheus,
+  # grafana, kafka-exporter). When enabled, lingua-common injects OTEL_* into
+  # every app so all three signals flow to the Collector. Disable to drop the
+  # whole stack: `--set global.observability.enabled=false`.
+  observability:
+    enabled: true
+    otlpEndpoint: http://otel-collector:4318
+  # Kafka Schema Registry (Confluent, Protobuf). When enabled, the
+  # schema-registry subchart is deployed and lingua-common injects
+  # SCHEMA_REGISTRY_URL into every app, so producers/consumers serialize events
+  # as Protobuf through the registry. Disabled by default → events stay JSON
+  # (the seam is opt-in, exactly like observability). Internal gRPC is always on.
+  schemaRegistry:
+    enabled: false
+    url: http://schema-registry:8081
+    # basic auth for a managed registry (e.g. DO Karapace). When
+    # enabled, lingua-common injects SCHEMA_REGISTRY_USER/PASSWORD from
+    # lingua-secrets. The in-cluster/dev registry needs none.
+    auth:
+      enabled: false
+
+# In-cluster stateful dependencies. Enabled for k3d/compose-parity; staging
+# disables these and points the apps at managed PostgreSQL / Kafka instead
+# (same opt-out idiom as observability/schemaRegistry).
+postgres:
+  enabled: true
+kafka:
+  enabled: true
+
+secrets:
+  # k3d renders lingua-secrets from these demo defaults. Staging sets
+  # `create: false` and the deploy job pre-creates lingua-secrets from
+  # Terraform outputs / GitHub Secrets (so managed creds never enter the Helm
+  # release history).
+  create: true
+  postgresPassword: lingua
+  bffCookieSecret: dev-cookie-secret-change-me
+  keycloakAdminPassword: admin
+  minioAccessKey: minioadmin
+  minioSecretKey: minioadmin
+  # Only needed when svc-ai-dialog.env.LLM_PROVIDER=anthropic.
+  anthropicApiKey: ''

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: prometheus
+description: Prometheus — scrapes Collector RED metrics + Kafka consumer lag
+type: application
+version: 0.1.0

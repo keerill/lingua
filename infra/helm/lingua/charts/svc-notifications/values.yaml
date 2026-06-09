@@ -1,0 +1,15 @@
+image:
+  repository: lingua/svc-notifications
+
+port: 3108
+
+migration:
+  enabled: true
+
+env:
+  SVC_NOTIFICATIONS_PORT: '3108'
+  KAFKA_BROKERS: '{{ .Values.global.kafkaBrokers }}'
+  NOTIFICATIONS_REMINDER_CRON: '0 9 * * *'
+
+secretEnv:
+  - DATABASE_URL_NOTIFICATIONS

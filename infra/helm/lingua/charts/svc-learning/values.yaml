@@ -1,0 +1,16 @@
+image:
+  repository: lingua/svc-learning
+
+port: 3103
+grpcPort: 50053
+
+migration:
+  enabled: true
+
+env:
+  SVC_LEARNING_PORT: '3103'
+  SVC_LEARNING_GRPC_PORT: '50053'
+  KAFKA_BROKERS: '{{ .Values.global.kafkaBrokers }}'
+
+secretEnv:
+  - DATABASE_URL_LEARNING

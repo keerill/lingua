@@ -1,0 +1,16 @@
+image:
+  repository: lingua/svc-vocabulary
+
+port: 3102
+grpcPort: 50052
+
+migration:
+  enabled: true
+
+env:
+  SVC_VOCABULARY_PORT: '3102'
+  SVC_VOCABULARY_GRPC_PORT: '50052'
+  KAFKA_BROKERS: '{{ .Values.global.kafkaBrokers }}'
+
+secretEnv:
+  - DATABASE_URL_VOCABULARY

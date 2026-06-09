@@ -1,0 +1,20 @@
+image:
+  repository: lingua/shell
+
+# nginx-unprivileged
+port: 8080
+probePath: /healthz
+
+ingress:
+  enabled: true
+  subdomain: app
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+# nginx-unprivileged runs as uid 101.
+runAsUser: 101

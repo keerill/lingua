@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------------------
+# Lingua OpenTelemetry Collector — single source of truth, used by
+# BOTH the docker-compose observability layer and the Helm subchart (rendered
+# into a ConfigMap). Downstream service names (tempo/loki/prometheus) are kept
+# IDENTICAL across compose and k8s so this one config works in both.
+#
+# Pipelines:
+#   traces  → Tempo  (+ spanmetrics connector derives RED metrics)
+#   metrics → Prometheus scrape endpoint (OTLP app metrics + spanmetrics)
+#   logs    → Loki (native OTLP ingest)
+# ---------------------------------------------------------------------------
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+connectors:
+  # Derives request rate / error rate / latency histograms FROM the traces,
+  # so per-service latency dashboards need no app-side metric code.
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s]
+    dimensions:
+      - name: service.name
+      - name: span.kind
+    metrics_flush_interval: 15s
+
+processors:
+  batch: {}
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: lingua
+        action: upsert
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    # Promote resource attrs (service.name → service_name label) onto metrics.
+    resource_to_telemetry_conversion:
+      enabled: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlp/tempo, spanmetrics]
+    metrics:
+      receivers: [otlp, spanmetrics]
+      processors: [resource, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlphttp/loki]
+  telemetry:
+    logs:
+      level: info

@@ -1,0 +1,15 @@
+image:
+  repository: lingua/svc-identity
+
+port: 3101
+grpcPort: 50051
+
+migration:
+  enabled: true
+
+env:
+  SVC_IDENTITY_PORT: '3101'
+  SVC_IDENTITY_GRPC_PORT: '50051'
+
+secretEnv:
+  - DATABASE_URL_IDENTITY

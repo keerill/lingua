@@ -1,0 +1,9 @@
+image: confluentinc/cp-schema-registry:7.7.1
+port: 8081
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    memory: 768Mi

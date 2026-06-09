@@ -1,0 +1,5 @@
+apiVersion: v2
+name: mfe-studio
+description: Lingua studio micro-frontend — MF 2.0 remote, admin role (static, nginx)
+type: application
+version: 0.1.0

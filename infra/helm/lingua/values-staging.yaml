@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------------------
+# Lingua umbrella — staging overrides.
+#
+# Layered on top of values.yaml by the deploy job:
+#   helm upgrade --install lingua infra/helm/lingua \
+#     -f infra/helm/lingua/values-staging.yaml \
+#     --set global.imageRegistry=ghcr.io/<owner>/lingua \
+#     --set global.imageTag=<git-sha>
+#
+# What changes vs the k3d defaults:
+#   - images pulled from GHCR (private) via the `ghcr-pull` secret;
+#   - in-cluster postgres + kafka turned OFF — apps point at DO Managed
+#     PostgreSQL / Managed Kafka (+ built-in Karapace Schema Registry);
+#   - lingua-secrets is NOT rendered here (secrets.create:false): the deploy job
+#     pre-creates it from Terraform outputs so managed creds stay out of the
+#     Helm release history.
+#
+# `<...>` placeholders are filled by the deploy job / Terraform outputs; commit
+# only non-secret managed endpoints, never credentials.
+# ---------------------------------------------------------------------------
+
+global:
+  # Real DNS for the staging ingress (Traefik on DOKS). Frontends bake this at
+  # build time, so the CI docker matrix must use the same STAGING_DOMAIN.
+  domain: staging.lingua.example.com
+  # ghcr.io/<owner>/lingua — overridden by the deploy job via --set.
+  imageRegistry: ghcr.io/your-org/lingua
+  # Immutable per-commit tag (set by the deploy job via --set global.imageTag).
+  imageTag: latest
+  # Tags are immutable (<git-sha>), so no need to always re-pull.
+  imagePullPolicy: IfNotPresent
+  ingressClassName: traefik
+  # GHCR is private → pods/initContainers/seed pull with this secret (the deploy
+  # job creates it from a read:packages PAT).
+  imagePullSecrets:
+    - name: ghcr-pull
+
+  # Managed Kafka brokers (DO). SASL_SSL list, comma-separated. Filled from the
+  # Terraform `kafka_brokers` output by the deploy job.
+  kafkaBrokers: '<managed-kafka-broker-1:9092>,<managed-kafka-broker-2:9092>'
+  kafkaAuth:
+    # DO Managed Kafka mandates SASL_SSL; creds + CA come from lingua-secrets
+    # (KAFKA_SASL_USERNAME / KAFKA_SASL_PASSWORD / KAFKA_SSL_CA).
+    enabled: true
+
+  observability:
+    # Keep the full OTel stack in staging — it is the portfolio highlight.
+    enabled: true
+    otlpEndpoint: http://otel-collector:4318
+
+  schemaRegistry:
+    # DO Managed Kafka ships a built-in Karapace registry (Confluent-API
+    # compatible). URL filled from the Terraform `schema_registry_uri` output.
+    enabled: true
+    url: '<managed-karapace-url>'
+    auth:
+      # Karapace requires basic auth → SCHEMA_REGISTRY_USER/PASSWORD from
+      # lingua-secrets.
+      enabled: true
+
+# Use managed data services instead of the in-cluster StatefulSets.
+postgres:
+  enabled: false
+kafka:
+  enabled: false
+
+# lingua-secrets is created out-of-band by the deploy job (see above).
+secrets:
+  create: false
+
+# Keycloak still runs in-cluster, but against the managed `keycloak` database.
+# url / passwordSecretKey filled from Terraform outputs by the deploy job
+# (--set keycloak.db.url=..., keycloak.db.user=..., keycloak.db.passwordSecretKey=...).
+keycloak:
+  db:
+    url: 'jdbc:postgresql://<managed-pg-host>:<port>/keycloak?sslmode=require'
+    user: '<managed-pg-user>'
+    passwordSecretKey: POSTGRES_PASSWORD

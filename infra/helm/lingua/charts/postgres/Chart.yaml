@@ -1,0 +1,5 @@
+apiVersion: v2
+name: postgres
+description: PostgreSQL 18 single instance, db-per-service (8 logical databases)
+type: application
+version: 0.1.0

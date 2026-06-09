@@ -1,0 +1,46 @@
+# ---------------------------------------------------------------------------
+# Lingua — Kafka Schema Registry (Confluent, Protobuf). Layer ON TOP
+# of the dev infra:
+#
+#   docker compose -f infra/docker/docker-compose.dev.yml \
+#                  -f infra/docker/docker-compose.schema-registry.yml up -d
+#
+# Then run host services with the registry URL set (add to .env) so producers
+# and consumers serialize events as Protobuf through the registry:
+#   SCHEMA_REGISTRY_URL=http://localhost:8081
+# Leaving it unset keeps events on JSON (the serde seam is opt-in).
+#
+# Composes cleanly with docker-compose.observability.yml — both add the same
+# kafka INTERNAL listener (kafka:29092) that in-container clients connect to.
+# ---------------------------------------------------------------------------
+
+services:
+  # Add an INTERNAL listener advertised as kafka:29092 so the containerized
+  # Schema Registry reaches the broker by service name (host flow on :9092 is
+  # unchanged). Identical to the observability override, so layering is safe.
+  kafka:
+    environment:
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092,INTERNAL://kafka:29092'
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.7.1
+    container_name: lingua-schema-registry
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka:29092'
+      SCHEMA_REGISTRY_LISTENERS: 'http://0.0.0.0:8081'
+    ports:
+      - '8081:8081' # host apps → SCHEMA_REGISTRY_URL=http://localhost:8081
+    networks:
+      - lingua
+
+networks:
+  lingua:
+    name: lingua-dev
+    driver: bridge

@@ -1,0 +1,8 @@
+image: grafana/loki:3.7.2
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi

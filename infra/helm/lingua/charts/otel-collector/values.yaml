@@ -1,0 +1,8 @@
+image: otel/opentelemetry-collector-contrib:0.154.0
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi

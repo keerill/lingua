@@ -1,0 +1,11 @@
+image: danielqsj/kafka-exporter:v1.9.0
+
+# In-cluster the broker advertises kafka:9092, so connect directly.
+kafkaServer: kafka:9092
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

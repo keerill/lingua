@@ -1,0 +1,5 @@
+apiVersion: v2
+name: svc-identity
+description: Lingua identity service (user profiles)
+type: application
+version: 0.1.0

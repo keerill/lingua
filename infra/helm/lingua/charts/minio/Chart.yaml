@@ -1,0 +1,5 @@
+apiVersion: v2
+name: minio
+description: MinIO object store (speaking-practice audio) + bucket bootstrap Job
+type: application
+version: 0.1.0

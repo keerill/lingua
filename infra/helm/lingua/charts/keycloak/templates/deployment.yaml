@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: lingua
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: keycloak
+          image: {{ .Values.image }}
+          # Production mode against Postgres (compose dev uses start-dev+H2).
+          # Keycloak exits if the DB is unreachable — the pod restarts with
+          # backoff until the postgres StatefulSet is ready.
+          args: ['start', '--import-realm']
+          env:
+            - name: KC_DB
+              value: postgres
+            # In-cluster Postgres by default; staging overrides db.url with the
+            # managed JDBC URL (incl. ?sslmode=require) and db.passwordSecretKey
+            # with the managed password key.
+            - name: KC_DB_URL
+              value: {{ .Values.db.url | default (printf "jdbc:postgresql://postgres:5432/%s" .Values.db.database) | quote }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.db.user }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secretName }}
+                  key: {{ .Values.db.passwordSecretKey | default "POSTGRES_PASSWORD" }}
+            # One public URL for browser and in-cluster callers (CoreDNS
+            # rewrites it to Traefik inside the cluster) — fixes the issuer.
+            - name: KC_HOSTNAME
+              value: http://{{ .Values.ingress.subdomain }}.{{ .Values.global.domain }}
+            - name: KC_HTTP_ENABLED
+              value: 'true'
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: 'true'
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ .Values.adminUser }}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secretName }}
+                  key: KC_BOOTSTRAP_ADMIN_PASSWORD
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: management
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: management
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: lingua
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: lingua
+spec:
+  ingressClassName: {{ .Values.global.ingressClassName }}
+  rules:
+    - host: {{ .Values.ingress.subdomain }}.{{ .Values.global.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http

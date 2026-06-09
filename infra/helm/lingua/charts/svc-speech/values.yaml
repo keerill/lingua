@@ -1,0 +1,20 @@
+image:
+  repository: lingua/svc-speech
+
+port: 3105
+
+env:
+  SVC_SPEECH_PORT: '3105'
+  # Deterministic fake providers by default (the piper CLI / Transformers.js
+  # models are intentionally NOT baked into the image).
+  STT_PROVIDER: fake
+  TTS_PROVIDER: fake
+  MINIO_ENDPOINT: minio:9000
+  MINIO_BUCKET: lingua-audio
+  # Browser-facing base URL for audio links — must go through the ingress.
+  MINIO_PUBLIC_URL: 'http://minio.{{ .Values.global.domain }}'
+  MINIO_SECURE: 'false'
+
+secretEnv:
+  - MINIO_ACCESS_KEY
+  - MINIO_SECRET_KEY

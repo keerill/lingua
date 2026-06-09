@@ -1,0 +1,45 @@
+{{- if .Values.seed.enabled }}
+# Seeds demo content after install/upgrade. Runs the TypeScript seed through
+# swc-node inside the shared migrator image (full workspace). backoffLimit
+# absorbs the window where migrations have not been applied yet.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: svc-content-seed
+  labels:
+    {{- include "lingua-common.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: '1'
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 8
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: svc-content-seed
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        # migrator image declares USER node (uid 1000) by name — give kubelet
+        # the numeric uid so runAsNonRoot can be verified.
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: seed
+          image: {{ include "lingua-common.migratorImage" . }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          workingDir: /repo/apps/svc-content
+          command: ['node', '-r', '@swc-node/register', 'prisma/seed.ts']
+          env:
+            {{- include "lingua-common.env" . | nindent 12 }}
+          securityContext:
+            {{- include "lingua-common.containerSecurityContext" . | nindent 12 }}
+{{- end }}

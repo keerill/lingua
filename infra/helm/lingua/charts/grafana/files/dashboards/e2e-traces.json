@@ -1,0 +1,56 @@
+{
+  "uid": "lingua-e2e-traces",
+  "title": "Lingua — End-to-End Traces (across Kafka)",
+  "tags": ["lingua", "traces"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "How to read this",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "Each row is one trace. Click a Trace ID to open the waterfall and see a **single trace span multiple services and the Kafka boundary**.\n\n- **Card review** → `learning.review.completed send` (producer span) → click through to see `gateway-bff` HTTP → `svc-learning` → Kafka → `svc-progress` / `svc-notifications`.\n- **Conversation turn** → `speaking.turn` (WS root) → `svc-speech` + `svc-ai-dialog` → Kafka → `svc-vocabulary` → Kafka → `svc-learning`."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Card review traces (learning.review.completed)",
+      "type": "table",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ name = \"learning.review.completed send\" }",
+          "tableType": "traces",
+          "limit": 20
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Conversation turn traces (speaking.turn)",
+      "type": "table",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ name = \"speaking.turn\" }",
+          "tableType": "traces",
+          "limit": 20
+        }
+      ]
+    }
+  ]
+}

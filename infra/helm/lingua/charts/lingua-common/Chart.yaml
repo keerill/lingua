@@ -1,0 +1,9 @@
+apiVersion: v2
+name: lingua-common
+description: >-
+  Library chart with the shared Deployment/Service/Ingress templates for all
+  Lingua app charts. Helm merges template definitions across every chart in
+  the tree, so sibling subcharts can `include` these without declaring a
+  dependency.
+type: library
+version: 0.1.0

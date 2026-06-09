@@ -1,0 +1,100 @@
+# The `lingua` realm, templated for the cluster hostnames. Adapted from
+# infra/docker/keycloak/realm-export.json (compose dev) — only the redirect
+# URIs / web origins and the BFF client secret differ.
+{{- $domain := .Values.global.domain }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: lingua
+data:
+  lingua-realm.json: |
+    {
+      "realm": "lingua",
+      "enabled": true,
+      "sslRequired": "none",
+      "registrationAllowed": false,
+      "loginWithEmailAllowed": true,
+      "duplicateEmailsAllowed": false,
+      "accessTokenLifespan": 300,
+      "ssoSessionIdleTimeout": 1800,
+      "ssoSessionMaxLifespan": 36000,
+      "roles": {
+        "realm": [
+          { "name": "learner", "description": "Standard Lingua learner" },
+          { "name": "admin", "description": "Lingua administrator" }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "lingua-shell",
+          "name": "Lingua Shell (SPA)",
+          "enabled": true,
+          "publicClient": true,
+          "protocol": "openid-connect",
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "implicitFlowEnabled": false,
+          "serviceAccountsEnabled": false,
+          "redirectUris": [
+            "http://app.{{ $domain }}/*",
+            "http://api.{{ $domain }}/*"
+          ],
+          "webOrigins": [
+            "http://app.{{ $domain }}",
+            "http://api.{{ $domain }}",
+            "+"
+          ],
+          "attributes": {
+            "pkce.code.challenge.method": "S256",
+            "post.logout.redirect.uris": "http://app.{{ $domain }}/*##http://api.{{ $domain }}/*"
+          }
+        },
+        {
+          "clientId": "lingua-bff",
+          "name": "Lingua BFF (confidential)",
+          "enabled": true,
+          "publicClient": false,
+          "protocol": "openid-connect",
+          "secret": {{ .Values.global.keycloakBffClientSecret | quote }},
+          "clientAuthenticatorType": "client-secret",
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "implicitFlowEnabled": false,
+          "serviceAccountsEnabled": true,
+          "redirectUris": ["http://api.{{ $domain }}/*"],
+          "webOrigins": ["http://api.{{ $domain }}"],
+          "attributes": {
+            "post.logout.redirect.uris": "http://api.{{ $domain }}/*"
+          }
+        }
+      ],
+      "users": [
+        {
+          "username": "learner",
+          "email": "learner@lingua.dev",
+          "firstName": "Lina",
+          "lastName": "Learner",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            { "type": "password", "value": "learner", "temporary": false }
+          ],
+          "realmRoles": ["learner"]
+        },
+        {
+          "username": "admin",
+          "email": "admin@lingua.dev",
+          "firstName": "Adam",
+          "lastName": "Admin",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            { "type": "password", "value": "admin", "temporary": false }
+          ],
+          "realmRoles": ["learner", "admin"]
+        }
+      ]
+    }

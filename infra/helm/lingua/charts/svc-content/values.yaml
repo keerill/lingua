@@ -1,0 +1,21 @@
+image:
+  repository: lingua/svc-content
+
+port: 3106
+grpcPort: 50056
+
+migration:
+  enabled: true
+
+# Idempotent demo-content seed (5 scenarios + lessons + deck template), runs
+# as a post-install/post-upgrade hook Job. The seed script upserts by slug.
+seed:
+  enabled: true
+
+env:
+  SVC_CONTENT_PORT: '3106'
+  SVC_CONTENT_GRPC_PORT: '50056'
+  KAFKA_BROKERS: '{{ .Values.global.kafkaBrokers }}'
+
+secretEnv:
+  - DATABASE_URL_CONTENT

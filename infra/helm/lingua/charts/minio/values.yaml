@@ -1,0 +1,17 @@
+# Compose dev pins minio/minio:latest; override here for reproducible installs.
+image: minio/minio:latest
+mcImage: minio/mc:latest
+
+bucket: lingua-audio
+
+ingress:
+  subdomain: minio
+
+storage: 2Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    memory: 512Mi

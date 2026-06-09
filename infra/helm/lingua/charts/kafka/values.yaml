@@ -1,0 +1,23 @@
+# Toggle the in-cluster broker. Staging disables it (managed Kafka) via the
+# umbrella `kafka.enabled: false` override.
+enabled: true
+
+image: apache/kafka:3.9.0
+
+storage: 2Gi
+
+# Pre-created topics (same list as the compose kafka-setup one-shot).
+topics:
+  - vocabulary.card.created
+  - learning.review.completed
+  - speaking.mistake.detected
+  - vocabulary.cards.flagged
+  - content.scenario.updated
+  - notification.sent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 1Gi

@@ -1,0 +1,33 @@
+{{- if .Values.global.observability.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: lingua
+data:
+  datasources.yaml: |
+{{ .Files.Get "files/datasources.yaml" | indent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: lingua
+data:
+  dashboards.yaml: |
+{{ .Files.Get "files/dashboards-provider.yaml" | indent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: lingua
+data:
+{{ (.Files.Glob "files/dashboards/*.json").AsConfig | indent 2 }}
+{{- end }}

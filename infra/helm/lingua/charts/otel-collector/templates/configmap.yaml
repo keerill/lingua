@@ -1,0 +1,13 @@
+{{- if .Values.global.observability.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector
+  labels:
+    app.kubernetes.io/name: otel-collector
+    app.kubernetes.io/part-of: lingua
+data:
+  # Single source of truth — same file the compose stack bind-mounts.
+  otel-collector.yaml: |
+{{ .Files.Get "files/otel-collector.yaml" | indent 4 }}
+{{- end }}

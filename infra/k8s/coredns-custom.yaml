@@ -1,0 +1,13 @@
+# k3s CoreDNS imports /etc/coredns/custom/*.override from this ConfigMap into
+# the server block. The rewrite makes the PUBLIC Keycloak hostname resolvable
+# INSIDE the cluster (pods hit Traefik, which routes by Host header back to
+# Keycloak). One URL for browser and services -> the OIDC issuer in JWTs
+# matches what libs/auth validates against.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  lingua.override: |
+    rewrite name id.lingua.localhost traefik.kube-system.svc.cluster.local

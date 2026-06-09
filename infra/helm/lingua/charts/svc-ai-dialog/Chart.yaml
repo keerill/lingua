@@ -1,0 +1,5 @@
+apiVersion: v2
+name: svc-ai-dialog
+description: Lingua AI dialog service (conversation engine, mistake detection)
+type: application
+version: 0.1.0

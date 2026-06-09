@@ -1,0 +1,15 @@
+image: grafana/grafana:12.2.9
+
+# Browser host: grafana.<global.domain> via Traefik.
+ingress:
+  subdomain: grafana
+
+adminUser: admin
+adminPassword: admin
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi

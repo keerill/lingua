@@ -1,0 +1,18 @@
+Lingua deployed to namespace {{ .Release.Namespace }}.
+
+URLs (browsers resolve *.localhost to 127.0.0.1; port 80 is mapped to the
+k3d loadbalancer):
+
+  App (shell):     http://app.{{ .Values.global.domain }}        (learner/learner, admin/admin)
+  Public site:     http://www.{{ .Values.global.domain }}
+  API / WS (BFF):  http://api.{{ .Values.global.domain }}
+  Keycloak:        http://id.{{ .Values.global.domain }}         (admin console: admin/{{ .Values.secrets.keycloakAdminPassword }})
+  MinIO (audio):   http://minio.{{ .Values.global.domain }}
+
+Watch the rollout:
+
+  kubectl -n {{ .Release.Namespace }} get pods -w
+
+The first start is the slowest path: postgres init -> keycloak import +
+prisma migrate initContainers -> kafka topics / minio bucket / content seed
+hook jobs.

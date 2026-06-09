@@ -1,0 +1,15 @@
+# No service consumes Redis yet; it is
+# deployed for parity with docker-compose and future slices. Disable with
+# --set redis.enabled=false.
+enabled: true
+
+image: redis:7-alpine
+
+storage: 1Gi
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

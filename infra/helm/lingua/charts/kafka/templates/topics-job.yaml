@@ -1,0 +1,39 @@
+{{- if .Values.enabled }}
+# Pre-creates the event topics (parity with the compose kafka-setup one-shot).
+# Waits for the broker inside the container, so plain backoff is enough.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topics
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/part-of: lingua
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka-topics
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      containers:
+        - name: topics
+          image: {{ .Values.image }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092 >/dev/null 2>&1; do
+                echo 'waiting for kafka...'; sleep 3
+              done
+              {{- range .Values.topics }}
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
+                --create --if-not-exists --topic {{ . }} --partitions 1 --replication-factor 1
+              {{- end }}
+              echo 'topics ready'
+{{- end }}

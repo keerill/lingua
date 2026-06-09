@@ -1,0 +1,35 @@
+{{- if .Values.enabled }}
+# Adapted from infra/docker/postgres/init-databases.sh (compose dev). Runs on
+# first boot only (empty data dir). The k8s flavour adds the `keycloak`
+# database: in the cluster Keycloak runs in production mode against Postgres
+# instead of the dev-mode embedded H2 used by compose.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: lingua
+data:
+  init-databases.sh: |
+    #!/bin/sh
+    set -e
+
+    create_db() {
+      db="$1"
+      psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_USER" <<-EOSQL
+        SELECT 'CREATE DATABASE "$db" OWNER "$POSTGRES_USER"'
+        WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$db')\gexec
+    EOSQL
+      echo "ensured database: $db"
+    }
+
+    create_db identity
+    create_db vocabulary
+    create_db learning
+    create_db dialog
+    create_db content
+    create_db progress
+    create_db notifications
+    create_db keycloak
+{{- end }}

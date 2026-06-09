@@ -1,0 +1,5 @@
+apiVersion: v2
+name: gateway-bff
+description: Lingua API gateway / BFF (REST + WebSocket edge, Keycloak OIDC)
+type: application
+version: 0.1.0

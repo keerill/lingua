@@ -1,0 +1,136 @@
+# ---------------------------------------------------------------------------
+# Lingua — observability stack (dev). Layer ON TOP of the dev infra:
+#
+#   docker compose -f infra/docker/docker-compose.dev.yml \
+#                  -f infra/docker/docker-compose.observability.yml up -d
+#
+# Then run the services on the host with the Collector endpoint set, e.g.
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318  (add it to .env)
+# so all three signals (traces/metrics/logs) flow to the Collector.
+#
+# Config + dashboards are the SAME files the Helm subcharts render — bind-mounted
+# from infra/helm/lingua/charts/<component>/files to keep one source of truth.
+# Service names match the k8s Services (tempo/loki/prometheus/otel-collector) so
+# the collector/prometheus/grafana configs are identical across compose and k8s.
+# ---------------------------------------------------------------------------
+
+services:
+  # The dev broker advertises localhost:9092 for HOST apps. Add an INTERNAL
+  # listener advertised as kafka:29092 so the containerized kafka-exporter can
+  # reach the broker by service name (host flow on :9092 is unchanged).
+  kafka:
+    environment:
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092,INTERNAL://kafka:29092'
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.154.0
+    container_name: lingua-otel-collector
+    restart: unless-stopped
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    volumes:
+      - ../helm/lingua/charts/otel-collector/files/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - '4317:4317' # OTLP gRPC (host apps)
+      - '4318:4318' # OTLP HTTP  (host apps → OTEL_EXPORTER_OTLP_ENDPOINT)
+    depends_on:
+      - tempo
+      - loki
+    networks:
+      - lingua
+
+  tempo:
+    image: grafana/tempo:3.0.2
+    container_name: lingua-tempo
+    restart: unless-stopped
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ../helm/lingua/charts/tempo/files/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - '3200:3200' # HTTP API / query
+    networks:
+      - lingua
+
+  loki:
+    image: grafana/loki:3.7.2
+    container_name: lingua-loki
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/loki.yaml']
+    volumes:
+      - ../helm/lingua/charts/loki/files/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    ports:
+      - '3100:3100'
+    networks:
+      - lingua
+
+  prometheus:
+    image: prom/prometheus:v3.12.0
+    container_name: lingua-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=6h'
+    volumes:
+      - ../helm/lingua/charts/prometheus/files/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - '9090:9090'
+    depends_on:
+      - otel-collector
+      - kafka-exporter
+    networks:
+      - lingua
+
+  grafana:
+    image: grafana/grafana:12.2.9
+    container_name: lingua-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ../helm/lingua/charts/grafana/files/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ../helm/lingua/charts/grafana/files/dashboards-provider.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ../helm/lingua/charts/grafana/files/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '3001:3000' # host 3000 is gateway-bff
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    networks:
+      - lingua
+
+  # Consumer-group lag → Prometheus. Connects to the broker's INTERNAL listener
+  # (kafka:29092) added above. Prometheus scrapes it as kafka-exporter:9308
+  # (same target string the k8s Service uses).
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.9.0
+    container_name: lingua-kafka-exporter
+    restart: unless-stopped
+    command: ['--kafka.server=kafka:29092']
+    ports:
+      - '9308:9308'
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - lingua
+
+volumes:
+  tempo-data:
+  loki-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  lingua:
+    name: lingua-dev
+    driver: bridge

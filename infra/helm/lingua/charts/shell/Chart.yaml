@@ -1,0 +1,5 @@
+apiVersion: v2
+name: shell
+description: Lingua shell — Module Federation 2.0 host (static, nginx)
+type: application
+version: 0.1.0

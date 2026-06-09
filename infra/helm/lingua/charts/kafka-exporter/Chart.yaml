@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kafka-exporter
+description: kafka-exporter — Prometheus consumer-group lag metrics
+type: application
+version: 0.1.0

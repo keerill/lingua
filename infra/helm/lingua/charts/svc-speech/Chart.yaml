@@ -1,0 +1,5 @@
+apiVersion: v2
+name: svc-speech
+description: Lingua speech service (STT/TTS providers, MinIO audio store)
+type: application
+version: 0.1.0
