@@ -1,0 +1,31 @@
+.header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 18px;
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 12px;
+}
+
+.spacer {
+  margin-left: auto;
+}
+
+.home {
+  padding: 24px;
+  max-width: 720px;
+}
+
+.loading {
+  padding: 24px;
+}

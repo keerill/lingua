@@ -1,0 +1,140 @@
+# ---------------------------------------------------------------------------
+# Lingua — Slice 1 local infrastructure (walking skeleton).
+#
+# Brings up the stateful dependencies the Slice 1 services connect to from the
+# HOST (services themselves are run via `nx serve` on the host in Slice 1):
+#   - postgres   : one container, three logical DBs (identity/vocabulary/learning)
+#   - redis      : declared for future use
+#   - kafka      : single-node KRaft (no ZooKeeper)
+#   - keycloak   : OIDC, realm imported on first boot
+#
+# Usage:
+#   docker compose -f infra/docker/docker-compose.dev.yml up -d
+#
+# All host-facing ports match the values in the repo-root `.env`.
+# ---------------------------------------------------------------------------
+
+name: lingua-dev
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: lingua-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lingua
+      POSTGRES_PASSWORD: lingua
+      # Default DB; the init script creates the three per-service DBs.
+      POSTGRES_DB: lingua
+    ports:
+      - '5432:5432'
+    volumes:
+      # Postgres 18 images store data in a version-specific subdir; mount the
+      # PARENT dir (not /var/lib/postgresql/data) or the image refuses to start.
+      - postgres-data:/var/lib/postgresql
+      # Runs only on first boot (empty data dir). Creates identity/vocabulary/learning.
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lingua']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lingua
+
+  redis:
+    image: redis:7-alpine
+    container_name: lingua-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - lingua
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: lingua-kafka
+    restart: unless-stopped
+    ports:
+      # Host clients (KAFKA_BROKERS=localhost:9092) connect here.
+      - '9092:9092'
+    environment:
+      # --- KRaft single-node: this node is BOTH broker and controller ---
+      KAFKA_NODE_ID: '1'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:9093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+
+      # --- Listeners ---
+      # Empty host (`://:9092`) binds ALL interfaces — this is the apache/kafka
+      # blessed form (a literal 0.0.0.0 trips advertised-listener validation in
+      # this image). PLAINTEXT carries inter-broker + host traffic; CONTROLLER is
+      # the internal KRaft listener and is NOT advertised.
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      # Advertise localhost:9092 so a HOST client resolves the broker correctly.
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092'
+
+      # --- Single-node replication / dev defaults ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: '1'
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: '1'
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: '0'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      # The official image ships the CLI tools under /opt/kafka/bin.
+      test:
+        [
+          'CMD-SHELL',
+          '/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1',
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+    networks:
+      - lingua
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: lingua-keycloak
+    restart: unless-stopped
+    command: ['start-dev', '--import-realm']
+    environment:
+      # KC 26 uses KC_BOOTSTRAP_ADMIN_*; we also set the legacy KEYCLOAK_ADMIN_*
+      # vars so the bootstrap admin is created regardless of which the running
+      # patch release honours.
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: 'true'
+      KC_HTTP_ENABLED: 'true'
+    ports:
+      - '8080:8080'
+    volumes:
+      # Realm `lingua` is imported on startup (start-dev uses an embedded H2 DB,
+      # which is fine for Slice 1).
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    networks:
+      - lingua
+
+volumes:
+  postgres-data:
+  redis-data:
+  kafka-data:
+
+networks:
+  lingua:
+    name: lingua-dev
+    driver: bridge

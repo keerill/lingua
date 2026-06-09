@@ -1,0 +1,22 @@
+.screen {
+  padding: 24px;
+  max-width: 720px;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.input {
+  padding: 8px;
+}
+
+.error {
+  color: crimson;
+}
+
+.added {
+  margin-top: 24px;
+}

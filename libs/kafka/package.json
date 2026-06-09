@@ -1,0 +1,15 @@
+{
+  "name": "@lingua/kafka",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@lingua/contracts": "workspace:*",
+    "@confluentinc/kafka-javascript": "1.9.1"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "11.1.26"
+  }
+}

@@ -1,0 +1,69 @@
+.screen {
+  padding: 24px;
+  max-width: 560px;
+}
+
+.card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.term {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.answer {
+  margin-top: 16px;
+  font-size: 22px;
+  color: #2563eb;
+}
+
+.example {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.reveal {
+  margin-top: 16px;
+}
+
+.error {
+  color: crimson;
+}
+
+.grades {
+  display: flex;
+  gap: 8px;
+}
+
+.grade {
+  flex: 1;
+  padding: 10px 0;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.again {
+  background: #ef4444;
+}
+.hard {
+  background: #f59e0b;
+}
+.good {
+  background: #10b981;
+}
+.easy {
+  background: #3b82f6;
+}

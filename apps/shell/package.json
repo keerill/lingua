@@ -1,0 +1,13 @@
+{
+  "name": "@lingua/shell",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@lingua/contracts": "workspace:*",
+    "@tanstack/react-query": "5.101.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "react-router-dom": "7.17.0"
+  }
+}

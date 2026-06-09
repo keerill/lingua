@@ -1,0 +1,44 @@
+.screen {
+  padding: 24px;
+  max-width: 720px;
+}
+
+.form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.input {
+  flex: 1;
+  padding: 8px;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.deck {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.langs {
+  color: #6b7280;
+}
+
+.addLink {
+  margin-left: 12px;
+}
+
+.error {
+  color: crimson;
+}
+
+.reviewLink {
+  margin-top: 24px;
+}

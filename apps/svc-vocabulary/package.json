@@ -1,0 +1,18 @@
+{
+  "name": "@lingua/svc-vocabulary",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "@lingua/contracts": "workspace:*",
+    "@lingua/kafka": "workspace:*",
+    "@nestjs/common": "11.1.26",
+    "@nestjs/config": "4.0.4",
+    "@nestjs/core": "11.1.26",
+    "@nestjs/platform-express": "11.1.26",
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  }
+}

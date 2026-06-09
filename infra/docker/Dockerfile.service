@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# Lingua — generic NestJS service image (SCAFFOLDING).
+#
+# In Slice 1 the product services are run on the HOST via `nx serve` against the
+# infra from docker-compose.dev.yml. This Dockerfile is reference scaffolding
+# for later slices (real Kubernetes builds land in Slice 4) and is parameterised
+# so it works for any NestJS service in apps/.
+#
+# Build from the REPO ROOT (build context = monorepo root) e.g.:
+#   docker build -f infra/docker/Dockerfile.service \
+#     --build-arg SERVICE=svc-vocabulary -t lingua/svc-vocabulary .
+#
+# gateway-bff has no prisma/ dir; the generate step is skipped automatically.
+# ---------------------------------------------------------------------------
+
+# --- deps + build ----------------------------------------------------------
+FROM node:24-alpine AS build
+ARG SERVICE
+WORKDIR /repo
+
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
+
+# Install the full workspace (build needs dev deps: tsc, prisma, nx, tsx...).
+COPY . .
+RUN pnpm install --frozen-lockfile
+
+# Generate the Prisma client into apps/<service>/src/generated/prisma when the
+# service ships a schema (Prisma 7 reads apps/<service>/prisma.config.ts).
+RUN if [ -d "apps/${SERVICE}/prisma" ]; then \
+      cd "apps/${SERVICE}" && pnpm exec prisma generate; \
+    fi
+
+# Compile the single project via Nx (outputs to apps/<service>/dist).
+RUN pnpm exec nx build "${SERVICE}"
+
+# --- runtime ---------------------------------------------------------------
+FROM node:24-alpine AS runtime
+ARG SERVICE
+ENV NODE_ENV=production
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
+
+# Bring in the built service + the installed node_modules from the build stage.
+# (Kept intentionally simple — a leaner prod install / pruning is a Slice 4 task.)
+COPY --from=build /repo/apps/${SERVICE}/dist ./dist
+COPY --from=build /repo/node_modules ./node_modules
+COPY --from=build /repo/package.json ./package.json
+
+# The compiled entrypoint. tsc preserves the src tree under dist/, so main.ts
+# becomes dist/main.js.
+CMD ["node", "dist/main.js"]

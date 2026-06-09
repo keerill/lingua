@@ -1,0 +1,22 @@
+// svc-identity — owns user profiles (database-per-service).
+// `id` IS the Keycloak `sub` (we don't mint our own ids). Prisma 7.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          String   @id // Keycloak sub
+  email       String
+  displayName String   @map("display_name")
+  roles       String[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}

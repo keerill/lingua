@@ -1,0 +1,21 @@
+packages:
+  - 'apps/*'
+  - 'libs/*'
+
+# We deliberately pin the latest stable patches (spec: target June 2026), so
+# disable pnpm's "minimum release age" supply-chain gate that would otherwise
+# defer freshly published versions.
+minimumReleaseAge: 0
+
+# Native packages allowed to run install/build scripts. pnpm blocks these by
+# default since v10 for supply-chain safety; Lingua's toolchain needs them.
+allowBuilds:
+  '@confluentinc/kafka-javascript': true
+  '@parcel/watcher': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@swc/core': true
+  esbuild: true
+  nx: true
+  prisma: true
+  unrs-resolver: true

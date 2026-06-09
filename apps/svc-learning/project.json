@@ -1,0 +1,45 @@
+{
+  "name": "svc-learning",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/svc-learning/src",
+  "projectType": "application",
+  "tags": ["scope:learning", "type:service"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-learning",
+        "command": "node --env-file=../../.env --watch -r @swc-node/register src/main.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/svc-learning",
+        "command": "tsc -p tsconfig.app.json"
+      }
+    },
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-learning",
+        "command": "prisma generate"
+      }
+    },
+    "prisma-migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/svc-learning",
+        "command": "prisma migrate dev"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "apps/svc-learning/jest.config.ts"
+      }
+    }
+  }
+}
