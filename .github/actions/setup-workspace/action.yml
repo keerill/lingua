@@ -1,0 +1,31 @@
+name: Setup workspace
+description: >-
+  Enable corepack pnpm, install Node 24 with a pnpm store cache, install the
+  workspace from the frozen lockfile, and restore the local Nx cache. Shared by
+  every CI job so the install/cache config lives in one place (no Nx Cloud).
+
+runs:
+  using: composite
+  steps:
+    # corepack provides the pnpm version pinned in package.json#packageManager,
+    # and must run before setup-node so its pnpm cache can find the store.
+    - shell: bash
+      run: corepack enable
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: pnpm
+
+    - shell: bash
+      run: pnpm install --frozen-lockfile
+
+    # Local Nx computation cache (Nx Cloud is not configured). Keyed by lockfile
+    # + commit; restore-keys fall back to the newest cache for the same lockfile.
+    - uses: actions/cache@v4
+      with:
+        path: .nx/cache
+        key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+        restore-keys: |
+          nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+          nx-${{ runner.os }}-

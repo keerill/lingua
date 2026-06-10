@@ -1,0 +1,21 @@
+# Copy to staging.tfvars and fill in. Token can also come from DIGITALOCEAN_TOKEN.
+#   terraform apply -var-file=staging.tfvars
+# do_token = "dop_v1_..."          # prefer: export DIGITALOCEAN_TOKEN=...
+
+environment = "staging"
+region      = "fra1"
+
+# DOKS — 3 small nodes are enough for the whole stack.
+kubernetes_version_prefix = "1.36."
+node_size                 = "s-2vcpu-4gb"
+node_count                = 3
+
+# Managed PostgreSQL (single node for the demo).
+pg_version    = "17"
+pg_size       = "db-s-1vcpu-2gb"
+pg_node_count = 1
+
+# Managed Kafka — DO requires >= 3 nodes.
+kafka_version    = "3.7"
+kafka_size       = "db-s-2vcpu-2gb"
+kafka_node_count = 3

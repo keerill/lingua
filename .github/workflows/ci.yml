@@ -1,0 +1,200 @@
+# affected-based CI/CD.
+#
+#   verify  : nx affected -t lint test build   (lint is a no-op until lint
+#             targets exist; build typechecks via tsc; test runs jest)
+#   schema  : buf lint + buf breaking vs main  (Kafka/gRPC contract gate, 4c)
+#   matrix  : scripts/ci/affected-images.sh    → docker build matrix
+#   docker  : build each affected image; push to GHCR only on push→main
+#   deploy  : helm upgrade into the staging DOKS cluster (push→main, gated)
+#
+# nx-set-shas resolves the affected base/head (last successful run on push, the
+# merge base on PRs). The deploy job degrades gracefully: it is skipped unless
+# the `staging` environment variable STAGING_ENABLED == 'true', so forks and
+# infra-less contributors still get green verify/schema/docker checks.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # nx-set-shas needs history to find the base SHA
+      - uses: ./.github/actions/setup-workspace
+      - uses: nrwl/nx-set-shas@v4
+      - name: Lint, test, build (affected)
+        run: pnpm exec nx affected -t lint test build --parallel=3
+
+  schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # buf breaking diffs against origin/main
+      - uses: ./.github/actions/setup-workspace
+      - name: Lint protobuf contracts
+        run: pnpm buf:lint
+      - name: Check for breaking schema changes vs main
+        run: pnpm buf:breaking
+
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+      has_images: ${{ steps.gen.outputs.has_images }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-workspace
+      - uses: nrwl/nx-set-shas@v4
+      - name: Compute affected image matrix
+        id: gen
+        # Frontends bake the domain at build time, so the matrix uses the staging
+        # domain (override via the STAGING_DOMAIN repo/Environment variable).
+        env:
+          DOMAIN: ${{ vars.STAGING_DOMAIN || 'staging.lingua.example.com' }}
+        run: bash scripts/ci/affected-images.sh
+
+  docker:
+    needs: [verify, schema, matrix]
+    if: needs.matrix.outputs.has_images == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Image prefix (GHCR requires a lowercase owner)
+        run: echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/lingua" >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build ${{ matrix.image }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          build-args: ${{ matrix.build_args }}
+          # PRs validate the build + warm the cache; only push→main publishes.
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:staging
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency: deploy-staging # never two deploys at once
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.STAGING_KUBECONFIG }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          kubectl create namespace lingua --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create GHCR pull secret
+        run: |
+          kubectl -n lingua create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username='${{ github.actor }}' \
+            --docker-password='${{ secrets.GHCR_PULL_TOKEN }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create lingua-secrets (managed creds, out of band)
+        # Pre-creating the Secret keeps managed credentials out of the Helm
+        # release history (values-staging.yaml sets secrets.create=false).
+        run: |
+          kubectl -n lingua create secret generic lingua-secrets \
+            --from-literal=POSTGRES_PASSWORD='${{ secrets.MANAGED_PG_PASSWORD }}' \
+            --from-literal=DATABASE_URL_IDENTITY='${{ secrets.DATABASE_URL_IDENTITY }}' \
+            --from-literal=DATABASE_URL_VOCABULARY='${{ secrets.DATABASE_URL_VOCABULARY }}' \
+            --from-literal=DATABASE_URL_LEARNING='${{ secrets.DATABASE_URL_LEARNING }}' \
+            --from-literal=DATABASE_URL_DIALOG='${{ secrets.DATABASE_URL_DIALOG }}' \
+            --from-literal=DATABASE_URL_CONTENT='${{ secrets.DATABASE_URL_CONTENT }}' \
+            --from-literal=DATABASE_URL_PROGRESS='${{ secrets.DATABASE_URL_PROGRESS }}' \
+            --from-literal=DATABASE_URL_NOTIFICATIONS='${{ secrets.DATABASE_URL_NOTIFICATIONS }}' \
+            --from-literal=BFF_COOKIE_SECRET='${{ secrets.BFF_COOKIE_SECRET }}' \
+            --from-literal=KEYCLOAK_BFF_CLIENT_SECRET='${{ secrets.KEYCLOAK_BFF_CLIENT_SECRET }}' \
+            --from-literal=KC_BOOTSTRAP_ADMIN_PASSWORD='${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}' \
+            --from-literal=MINIO_ACCESS_KEY='${{ secrets.MINIO_ACCESS_KEY }}' \
+            --from-literal=MINIO_SECRET_KEY='${{ secrets.MINIO_SECRET_KEY }}' \
+            --from-literal=ANTHROPIC_API_KEY='${{ secrets.ANTHROPIC_API_KEY }}' \
+            --from-literal=KAFKA_SASL_USERNAME='${{ secrets.KAFKA_SASL_USERNAME }}' \
+            --from-literal=KAFKA_SASL_PASSWORD='${{ secrets.KAFKA_SASL_PASSWORD }}' \
+            --from-literal=KAFKA_SSL_CA='${{ secrets.KAFKA_SSL_CA }}' \
+            --from-literal=SCHEMA_REGISTRY_USER='${{ secrets.SCHEMA_REGISTRY_USER }}' \
+            --from-literal=SCHEMA_REGISTRY_PASSWORD='${{ secrets.SCHEMA_REGISTRY_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Helm upgrade (staging)
+        # Dynamic values (image ref, managed endpoints) go through a generated
+        # values file so the comma-separated broker list doesn't trip --set.
+        run: |
+          cat > /tmp/values-ci.yaml <<EOF
+          global:
+            imageRegistry: ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/lingua
+            imageTag: ${{ github.sha }}
+            keycloakBffClientSecret: "${{ secrets.KEYCLOAK_BFF_CLIENT_SECRET }}"
+            kafkaBrokers: "${{ secrets.STAGING_KAFKA_BROKERS }}"
+            schemaRegistry:
+              url: "${{ secrets.SCHEMA_REGISTRY_URL }}"
+          keycloak:
+            db:
+              url: "${{ secrets.KEYCLOAK_DATABASE_URL }}"
+              user: "${{ secrets.MANAGED_PG_USER }}"
+          EOF
+          helm upgrade --install lingua infra/helm/lingua \
+            -f infra/helm/lingua/values-staging.yaml \
+            -f /tmp/values-ci.yaml \
+            --namespace lingua \
+            --wait --timeout 20m
+
+      - name: Smoke check
+        env:
+          DOMAIN: ${{ vars.STAGING_DOMAIN }}
+        run: |
+          fail=0
+          check() {
+            for i in 1 2 3 4 5 6; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$1$2" || true)"
+              [[ "$code" == "200" ]] && { echo "  OK  https://$1$2"; return; }
+              echo "  ...($code) https://$1$2 (retry $i)"; sleep 10
+            done
+            echo "  FAIL https://$1$2"; fail=1
+          }
+          check "api.$DOMAIN" /health
+          check "app.$DOMAIN" /healthz
+          check "www.$DOMAIN" /
+          [[ "$fail" == "0" ]]
